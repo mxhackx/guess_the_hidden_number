@@ -126,10 +126,10 @@ class Glyph {
 
             if (str.empty())
                 return prefix;
-            prefix.push_back(glyphs[(int)str[0]].advance);
+            prefix[0] = (glyphs[(int)str[0]].advance);
             for (int i = 1; i < str.size(); i++){
-                w = glyphs[str[i]].advance + kernings[str[i - 1]][str[i]];
-                prefix.push_back(prefix[i - 1] + w);
+                w = glyphs[(int)str[i]].advance + kernings[str[i - 1]][str[i]];
+                prefix[i] = (prefix[i - 1] + w);
             }
             return prefix;
         }
@@ -182,32 +182,14 @@ void Input::update_offset()
     string str = "";
 
     text.setFillColor((!focus) ? p_color : (!value.empty()) ? s_color : p_color);
-    caret.setPosition(sf::Vector2f(position.x + 2.f, position.y + (height - caret.getSize().y) / 2.f));
     if (value.size() == 0){
+        caret.setPosition(sf::Vector2f(position.x + 2.f, position.y + (height - caret.getSize().y) / 2.f));
         text.setString(placeholder);
         return;
     }
-    str = value.substr(off_begin, off_end - off_begin);
-    text.setString(str);
-    while (static_cast<int>(value.size()) > static_cast<int>(str.size()) && r.width <= width - 5){
-        off_begin -= 1;
-        if (off_begin < 0){
-            off_begin = 0;
-            break;
-        }
-        str = value.substr(off_begin, off_end - off_begin);
-        text.setString(str);
-        r = text.getGlobalBounds();
-    }
-    str = value.substr(off_begin, off_end - off_begin);
-    text.setString(str);
-    r = text.getGlobalBounds();
-    while (r.width >= width){
-        off_begin += 1;
-        str = value.substr(off_begin, off_end - off_begin);
-        text.setString(str);
-        r = text.getGlobalBounds();
-    }
+    if (!value.empty())
+        caret.setPosition(sf::Vector2f(prefix[index - 1] + position.x, position.y));
+    text.setString(value);
 }
 
 void Input::handle_event(sf::Event& event, sf::RenderWindow& win)
@@ -215,15 +197,24 @@ void Input::handle_event(sf::Event& event, sf::RenderWindow& win)
     char c = Event::get_char(event, win);
 
     focus = Event::is_focus<sf::RectangleShape>(field, event, win, focus);
-    if (c >= 32 && c <= 126)
-        value.push_back(c);
-    if (c == Event::BackSpace + 1 && !value.empty())
-        value.pop_back();
+    if (!focus)
+        index = 0;
+    if (c == 0)
+        return;
     if (c == Event::Left + 1)
         index = max(0, index - 1);
     if (c == Event::Right + 1)
         index = min(static_cast<int>(value.size()), index + 1);
-    off_end = value.size();
+    if (c >= 32 && c <= 126){
+        value.insert(value.begin() + index, c);
+        prefix = glyph.get_prefix_sum(value);
+        index++;
+    }
+    if (c == Event::BackSpace + 1 && index > 0){
+        value.erase(value.begin() + index - 1);
+        prefix = glyph.get_prefix_sum(value);
+        index--;
+    }
     update_offset();
 }
 
@@ -246,7 +237,8 @@ show(true),
 focus(false),
 off_begin(0),
 off_end(0),
-offset(0)
+offset(0),
+index(0)
 {
     font.loadFromFile(font_s);
     field.setSize(sf::Vector2f(width, height));
