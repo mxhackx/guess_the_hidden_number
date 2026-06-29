@@ -147,7 +147,6 @@ class Input {
         string placeholder;
         int off_begin;
         int off_end;
-        int offset;
         int index;
         int size;
         bool show;
@@ -178,7 +177,6 @@ class Input {
 
 void Input::update_offset()
 {
-    sf::FloatRect r(0, 0, 0, 0);
     string str = "";
 
     text.setFillColor((!focus) ? p_color : (!value.empty()) ? s_color : p_color);
@@ -187,9 +185,10 @@ void Input::update_offset()
         text.setString(placeholder);
         return;
     }
-    if (!value.empty())
-        caret.setPosition(sf::Vector2f(prefix[index - 1] + position.x, position.y));
-    text.setString(value);
+    float b = (off_begin > 0) ? prefix[off_begin - 1] : 0;
+    float c = position.x - b + ((index == 0) ? 0 : prefix[index - 1]);
+    caret.setPosition(sf::Vector2f(c, position.y + (height - caret.getSize().y) / 2.f));
+    text.setString(value.substr(off_begin, off_end - off_begin));
 }
 
 void Input::handle_event(sf::Event& event, sf::RenderWindow& win)
@@ -199,6 +198,7 @@ void Input::handle_event(sf::Event& event, sf::RenderWindow& win)
     focus = Event::is_focus<sf::RectangleShape>(field, event, win, focus);
     if (!focus)
         index = 0;
+    update_offset();
     if (c == 0)
         return;
     if (c == Event::Left + 1)
@@ -215,7 +215,6 @@ void Input::handle_event(sf::Event& event, sf::RenderWindow& win)
         prefix = glyph.get_prefix_sum(value);
         index--;
     }
-    update_offset();
 }
 
 const sf::Color Input::OUT_COLOR = sf::Color(60, 63, 69);
@@ -237,7 +236,6 @@ show(true),
 focus(false),
 off_begin(0),
 off_end(0),
-offset(0),
 index(0)
 {
     font.loadFromFile(font_s);
